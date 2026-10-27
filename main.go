@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package main
 
-import "github.com/JoshdRod/cmw-cli/cmd"
+import "github.com/JoshdRod/cmwcli/cmd"
 
 func main() {
 	cmd.Execute()
