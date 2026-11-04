@@ -1,3 +1,5 @@
+// Copyright 2021-2026 Contributors to the Veraison project.
+// SPDX-License-Identifier: Apache-2.0
 package cmd
 
 import (
@@ -9,7 +11,7 @@ import (
 
 func TestCreateRecord(t *testing.T) {
 	tempFilePath := filepath.Join(t.TempDir(), "out.cbor")
-	cmd := NewCollectionCmd()
+	cmd := NewCreateCmd()
 
 	args := []string{"--data=../testdata/cbor-in-1.cbor", "--output=" + tempFilePath}
 	cmd.SetArgs(args)
@@ -27,7 +29,7 @@ func TestCreateRecord(t *testing.T) {
 
 func TestCreateCollection(t *testing.T) {
 	tempFilePath := filepath.Join(t.TempDir(), "out.cbor")
-	cmd := NewCollectionCmd()
+	cmd := NewCreateCmd()
 
 	args := []string{"--data=../testdata/cbor-in-1.cbor", "--label=cbor1", "--data=../testdata/cbor-in-2.cbor", "--label=cbor2", "--output=" + tempFilePath}
 	cmd.SetArgs(args)
