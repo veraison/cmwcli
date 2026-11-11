@@ -3,10 +3,19 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+
 	"github.com/spf13/cobra"
 	"github.com/veraison/cmw"
 	"os"
+)
+
+var (
+	cmwCreateFiles      []string
+	cmwCreateLabels     []string
+	cmwCreateOutputFile string
+	cmwCreateCmwc_t     string
 )
 
 // createCmd represents the create command
@@ -30,79 +39,40 @@ func NewCreateCmd() *cobra.Command {
 	For example:
 
 	cmwcli create --data evidence.cbor --label "evidence" --cmwc_t "https://example.com" --output out.cbor`,
-		Run: func(cmd *cobra.Command, args []string) {
-			// Read flags
-			data, err := cmd.Flags().GetStringSlice("data")
-			if err != nil || data == nil || len(data) == 0 {
-				fmt.Println("No data inputted")
-				return
-			}
-
-			label, err := cmd.Flags().GetStringSlice("label")
-			if err != nil {
-				fmt.Println("Error parsing labels")
-				fmt.Println(err)
-				return
-			}
-			if len(data) > 1 && len(data) != len(label) {
-				fmt.Println("Failed to create container - Non-equal amount of files and labels input.")
-				fmt.Println("Given", len(data), "files, but", len(label), "labels.")
-				fmt.Println("Each file must have its own label.")
-				return
-			}
-
-			output, err := cmd.Flags().GetString("output")
-			if err != nil || output == "" {
-				fmt.Println("No output file specified")
-				return
-			}
-
-			cmwc_t, err := cmd.Flags().GetString("cmwc_t")
-			if err != nil {
-				fmt.Println("Invalid __cmwc_t specified")
-				fmt.Println(err)
-				return
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := checkCmwCreateArgs(); err != nil {
+				return err
 			}
 
 			var cmwOutput cmw.CMW
 			// Check how many files there are
-			if len(data) > 1 {
-				cmwOutputRef, err := cmw.NewCollection(cmwc_t)
+			if len(cmwCreateFiles) > 1 {
+				cmwOutputRef, err := cmw.NewCollection(cmwCreateCmwc_t)
 				if err != nil {
-					fmt.Println("Error creating collection")
-					fmt.Println(err)
-					return
+					return fmt.Errorf("Error creating collection: %s", err)
 				}
 				cmwOutput = *cmwOutputRef
 
-				for i, d := range data {
+				for i, d := range cmwCreateFiles {
 					file, err := os.ReadFile(d)
 					if err != nil {
-						fmt.Println("Error accessing cbor data in file", d)
-						fmt.Println(err)
-						return
+						return fmt.Errorf("Error accessing cbor data (%s) in file: %s", d, err)
 					}
 
 					newCMWItem, err := cmw.NewMonad("application/eat+cbor", file, 4)
-					err = cmwOutput.AddCollectionItem(label[i], newCMWItem)
+					err = cmwOutput.AddCollectionItem(cmwCreateLabels[i], newCMWItem)
 					if err != nil {
-						fmt.Println("Error adding evidence from file", d, "to CMW collection")
-						fmt.Println(err)
-						return
+						return fmt.Errorf("Error adding evidence from file (%s) to CMW collection: %s", d, err)
 					}
 				}
 			} else {
-				file, err := os.ReadFile(data[0])
+				file, err := os.ReadFile(cmwCreateFiles[0])
 				if err != nil {
-					fmt.Println("Error accessing cbor data in file", data[0])
-					fmt.Println(err)
-					return
+					return fmt.Errorf("Error accessing cbor data in file %s: %s", cmwCreateFiles[0], err)
 				}
 				cmwOutputRef, err := cmw.NewMonad("application/eat+cbor", file, 4)
 				if err != nil {
-					fmt.Println("Error creating CMW Record from", data[0])
-					fmt.Println(err)
-					return
+					return fmt.Errorf("Error creating CMW Record from file %s: %s", cmwCreateFiles[0], err)
 				}
 				cmwOutput = *cmwOutputRef
 			}
@@ -112,22 +82,31 @@ func NewCreateCmd() *cobra.Command {
 
 			cmwBytes, err := cmwOutput.MarshalCBOR()
 			if err != nil {
-				fmt.Println("Error marshalling CMW to a CBOR file. Maybe check the input file is valid CBOR?")
-				return
+				return errors.New("Error marshalling CMW to a CBOR file. Maybe check the input file is valid CBOR?")
 			}
 
-			err = os.WriteFile(output, cmwBytes, 0666)
+			err = os.WriteFile(cmwCreateOutputFile, cmwBytes, 0666)
 			if err != nil {
-				fmt.Println("Error writing to file")
-				return
+				return errors.New("Error writing to file")
 			}
+			return nil
 		},
 	}
-	cmd.Flags().StringSliceP("data", "d", nil, "Location of input data")
-	cmd.Flags().StringSliceP("label", "l", nil, "Label for input data")
-	cmd.Flags().StringP("output", "o", "", "Location of output file")
-	cmd.Flags().StringP("cmwc_t", "c", "", "The __cmwc_t of the parent collection")
+	cmd.Flags().StringArrayVarP(&cmwCreateFiles, "data", "d", []string{}, "Location of input data")
+	cmd.Flags().StringArrayVarP(&cmwCreateLabels, "label", "l", []string{}, "Label for input data")
+	cmd.Flags().StringVarP(&cmwCreateOutputFile, "output", "o", "", "Location of output file")
+	cmd.Flags().StringVarP(&cmwCreateCmwc_t, "cmwc_t", "c", "", "The __cmwc_t of the parent collection")
 	return cmd
+}
+func checkCmwCreateArgs() error {
+	if len(cmwCreateFiles) == 0 {
+		return errors.New("No data inputted")
+	}
+
+	if len(cmwCreateFiles) > 1 && len(cmwCreateFiles) != len(cmwCreateLabels) {
+		return fmt.Errorf("Non-equal amount of files and labels input. Given %d files, but %d labels.", len(cmwCreateFiles), len(cmwCreateLabels))
+	}
+	return nil
 }
 
 func init() {
