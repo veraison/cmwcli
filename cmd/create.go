@@ -21,24 +21,17 @@ var (
 // createCmd represents the create command
 var createCmd = NewCreateCmd()
 
-/*
-Create a new CMW from the evidence files input.
-If only one evidence file input, then create a CMW with a record.
-If multiple evidence files input, then create a CMW with a collection of records.
-All records have:
-
-	media type = application/eat+cbor
-	value = hash of evidence file
-	indicator = 4 (evidence)
-*/
+// NewCreateCmd builds the create command
 func NewCreateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a Conceptual Message Wrapper from (CBOR only) evidence file(s)",
 		Long: `Create a Conceptual Message Wrapper from (CBOR only) evidence file(s)
+	If only one evidence file are input, then a CMW with a record is created.
+	If multiple evidence files are input, then a CMW with a collection of records is created.
 	For example:
 
-	cmwcli create --data evidence.cbor --label "evidence" --cmwc_t "https://example.com" --output out.cbor`,
+	cmwcli create --data evidence.cbor --label "evidence" --data evidence2.cbor --label "evidence2" --cmwc_t "https://example.com" --output out.cbor`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := checkCmwCreateArgs(); err != nil {
 				return err
@@ -67,7 +60,7 @@ func NewCreateCmd() *cobra.Command {
 				// Create collection
 				cmwOutputRef, err := cmw.NewCollection(cmwCreateCmwc_t)
 				if err != nil {
-					return fmt.Errorf("Error creating collection: %s", err)
+					return fmt.Errorf("error creating collection: %s", err)
 				}
 				cmwOutput = *cmwOutputRef
 
@@ -82,7 +75,7 @@ func NewCreateCmd() *cobra.Command {
 
 			cmwBytes, err := cmwOutput.MarshalCBOR()
 			if err != nil {
-				return errors.New("Error marshalling CMW to a CBOR file. Maybe check the input file is valid CBOR?")
+				return errors.New("error marshalling CMW to a CBOR file. Maybe check the input file is valid CBOR?")
 			}
 
 			if cmwCreateOutputFile == "" {
@@ -106,11 +99,11 @@ func NewCreateCmd() *cobra.Command {
 }
 func checkCmwCreateArgs() error {
 	if len(cmwCreateFiles) == 0 {
-		return errors.New("No data inputted")
+		return errors.New("no data inputted")
 	}
 
 	if len(cmwCreateFiles) > 1 && len(cmwCreateFiles) != len(cmwCreateLabels) {
-		return fmt.Errorf("Non-equal amount of files and labels input. Given %d files, but %d labels.", len(cmwCreateFiles), len(cmwCreateLabels))
+		return fmt.Errorf("non-equal amount of files and labels input. Given %d files, but %d labels.", len(cmwCreateFiles), len(cmwCreateLabels))
 	}
 
 	return nil
