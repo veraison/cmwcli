@@ -5,13 +5,6 @@ This tool can:
 2. Append to existing CMW collections, by passing in file(s) as input.
 
 Currently in a prototype stage.
-TODO LIST:
-
-- ☑️ Serialise a CMW with a basic evidence CBOR
-- ☑️ Seralise multiple files into the same CMW
-- Append CBOR evidence(s) to an existing CMW
-
-CURRENT PROGRESS:
 
 To create a record from a single file:
 
