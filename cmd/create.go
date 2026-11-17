@@ -77,17 +77,20 @@ func NewCreateCmd() *cobra.Command {
 				cmwOutput = *cmwOutputRef
 			}
 
-			// Write to output file
-			fmt.Println(cmwOutput)
-
 			cmwBytes, err := cmwOutput.MarshalCBOR()
 			if err != nil {
 				return errors.New("Error marshalling CMW to a CBOR file. Maybe check the input file is valid CBOR?")
 			}
 
-			err = os.WriteFile(cmwCreateOutputFile, cmwBytes, 0666)
-			if err != nil {
-				return errors.New("Error writing to file")
+			if cmwCreateOutputFile == "" {
+				// Write to output file
+				fmt.Printf("%s", cmwBytes)
+			} else {
+				// Write to file
+				err = os.WriteFile(cmwCreateOutputFile, cmwBytes, 0666)
+				if err != nil {
+					return errors.New("error writing to file")
+				}
 			}
 			return nil
 		},
@@ -106,6 +109,7 @@ func checkCmwCreateArgs() error {
 	if len(cmwCreateFiles) > 1 && len(cmwCreateFiles) != len(cmwCreateLabels) {
 		return fmt.Errorf("Non-equal amount of files and labels input. Given %d files, but %d labels.", len(cmwCreateFiles), len(cmwCreateLabels))
 	}
+
 	return nil
 }
 
