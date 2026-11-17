@@ -44,37 +44,40 @@ func NewCreateCmd() *cobra.Command {
 				return err
 			}
 
+			// Convert all files into records
+			recordRefs := []*cmw.CMW{}
+			for _, d := range cmwCreateFiles {
+				file, err := os.ReadFile(d)
+				if err != nil {
+					return fmt.Errorf("error accessing cbor data (%s) in file: %s", d, err)
+				}
+				newRecordRef, err := cmw.NewMonad("application/eat+cbor", file, 4)
+				if err != nil {
+					return fmt.Errorf("error converting file (%s) into CMW record: %s", d, err)
+				}
+				recordRefs = append(recordRefs, newRecordRef)
+			}
+
+			// If > 1 record created, add all records to a collection
 			var cmwOutput cmw.CMW
-			// Check how many files there are
-			if len(cmwCreateFiles) > 1 {
+			if len(cmwCreateFiles) == 1 {
+				// Create record
+				cmwOutput = *recordRefs[0]
+			} else {
+				// Create collection
 				cmwOutputRef, err := cmw.NewCollection(cmwCreateCmwc_t)
 				if err != nil {
 					return fmt.Errorf("Error creating collection: %s", err)
 				}
 				cmwOutput = *cmwOutputRef
 
-				for i, d := range cmwCreateFiles {
-					file, err := os.ReadFile(d)
+				// Add all records to collection
+				for i, record := range recordRefs {
+					err = cmwOutput.AddCollectionItem(cmwCreateLabels[i], record)
 					if err != nil {
-						return fmt.Errorf("Error accessing cbor data (%s) in file: %s", d, err)
-					}
-
-					newCMWItem, err := cmw.NewMonad("application/eat+cbor", file, 4)
-					err = cmwOutput.AddCollectionItem(cmwCreateLabels[i], newCMWItem)
-					if err != nil {
-						return fmt.Errorf("Error adding evidence from file (%s) to CMW collection: %s", d, err)
+						return fmt.Errorf("error adding evidence from file (%s) to CMW collection: %s", cmwCreateFiles[i], err)
 					}
 				}
-			} else {
-				file, err := os.ReadFile(cmwCreateFiles[0])
-				if err != nil {
-					return fmt.Errorf("Error accessing cbor data in file %s: %s", cmwCreateFiles[0], err)
-				}
-				cmwOutputRef, err := cmw.NewMonad("application/eat+cbor", file, 4)
-				if err != nil {
-					return fmt.Errorf("Error creating CMW Record from file %s: %s", cmwCreateFiles[0], err)
-				}
-				cmwOutput = *cmwOutputRef
 			}
 
 			cmwBytes, err := cmwOutput.MarshalCBOR()
