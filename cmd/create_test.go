@@ -15,7 +15,7 @@ func TestCreateRecord(t *testing.T) {
 	tempFilePath := filepath.Join(t.TempDir(), "out.cbor")
 	cmd := NewCreateCmd()
 
-	args := []string{"--data=../testdata/cbor-in-1.cbor", "--output=" + tempFilePath}
+	args := []string{"--data=evidence:../testdata/cbor-in-1.cbor", "--output=" + tempFilePath}
 	cmd.SetArgs(args)
 
 	err := cmd.Execute()
@@ -33,7 +33,7 @@ func TestCreateCollection(t *testing.T) {
 	tempFilePath := filepath.Join(t.TempDir(), "out.cbor")
 	cmd := NewCreateCmd()
 
-	args := []string{"--data=../testdata/cbor-in-1.cbor", "--label=cbor1", "--data=../testdata/cbor-in-2.cbor", "--label=cbor2", "--output=" + tempFilePath}
+	args := []string{"--data=cbor1:evidence:../testdata/cbor-in-1.cbor", "--data=cbor2:evidence:../testdata/cbor-in-2.cbor", "--output=" + tempFilePath}
 	cmd.SetArgs(args)
 
 	err := cmd.Execute()
@@ -55,7 +55,7 @@ func TestCreateRecord_Stdout(t *testing.T) {
 
 	cmd := NewCreateCmd()
 
-	args := []string{"--data=../testdata/cbor-in-1.cbor"}
+	args := []string{"--data=evidence:../testdata/cbor-in-1.cbor"}
 	cmd.SetArgs(args)
 
 	os.Stdout = w
@@ -88,7 +88,7 @@ func TestCreateCollection_Stdout(t *testing.T) {
 
 	cmd := NewCreateCmd()
 
-	args := []string{"--data=../testdata/cbor-in-1.cbor", "--label=cbor1", "--data=../testdata/cbor-in-2.cbor", "--label=cbor2"}
+	args := []string{"--data=cbor1:evidence:../testdata/cbor-in-1.cbor", "--data=cbor2:evidence:../testdata/cbor-in-2.cbor"}
 	cmd.SetArgs(args)
 
 	os.Stdout = w

@@ -5,6 +5,8 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/veraison/cmw"
@@ -12,11 +14,16 @@ import (
 )
 
 var (
-	cmwCreateFiles      []string
-	cmwCreateLabels     []string
+	cmwCreateData       []string
 	cmwCreateOutputFile string
 	cmwCreateCmwc_t     string
 )
+
+type data struct {
+	label     string
+	indicator cmw.Indicator
+	filePath  string
+}
 
 // createCmd represents the create command
 var createCmd = NewCreateCmd()
@@ -31,29 +38,30 @@ func NewCreateCmd() *cobra.Command {
 	If multiple evidence files are input, then a CMW with a collection of records is created.
 	For example:
 
-	cmwcli create --data evidence.cbor --label "evidence" --data evidence2.cbor --label "evidence2" --cmwc_t "https://example.com" --output out.cbor`,
+	cmwcli create --data label1:evidence:evidence1.cbor --data label2:evidence:evidence2.cbor --cmwc_t "https://example.com" --output out.cbor`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := checkCmwCreateArgs(); err != nil {
+			data, err := parseCmwCreateArgs()
+			if err != nil {
 				return err
 			}
 
 			// Convert all files into records
 			recordRefs := []*cmw.CMW{}
-			for _, d := range cmwCreateFiles {
-				file, err := os.ReadFile(d)
+			for _, d := range data {
+				file, err := os.ReadFile(d.filePath)
 				if err != nil {
-					return fmt.Errorf("error accessing cbor data (%s) in file: %s", d, err)
+					return fmt.Errorf("error accessing cbor data (%s) in file: %s", d.filePath, err)
 				}
-				newRecordRef, err := cmw.NewMonad("application/eat+cbor", file, 4)
+				newRecordRef, err := cmw.NewMonad("application/eat+cbor", file, d.indicator)
 				if err != nil {
-					return fmt.Errorf("error converting file (%s) into CMW record: %s", d, err)
+					return fmt.Errorf("error converting file (%s) into CMW record: %s", d.filePath, err)
 				}
 				recordRefs = append(recordRefs, newRecordRef)
 			}
 
 			// If > 1 record created, add all records to a collection
 			var cmwOutput cmw.CMW
-			if len(cmwCreateFiles) == 1 {
+			if len(recordRefs) == 1 {
 				// Create record
 				cmwOutput = *recordRefs[0]
 			} else {
@@ -66,9 +74,9 @@ func NewCreateCmd() *cobra.Command {
 
 				// Add all records to collection
 				for i, record := range recordRefs {
-					err = cmwOutput.AddCollectionItem(cmwCreateLabels[i], record)
+					err = cmwOutput.AddCollectionItem(data[i].label, record)
 					if err != nil {
-						return fmt.Errorf("error adding evidence from file (%s) to CMW collection: %s", cmwCreateFiles[i], err)
+						return fmt.Errorf("error adding evidence from file (%s) to CMW collection: %s", data[i].filePath, err)
 					}
 				}
 			}
@@ -91,22 +99,66 @@ func NewCreateCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringArrayVarP(&cmwCreateFiles, "data", "d", []string{}, "Location of input data")
-	cmd.Flags().StringArrayVarP(&cmwCreateLabels, "label", "l", []string{}, "Label for input data")
+	cmd.Flags().StringArrayVarP(&cmwCreateData, "data", "d", []string{}, `Input Data, in form label:indicator:file (or indicator:file for a record).
+An indicator can take the values: reference-values (r), endorsements (en), evidence (ev), attestation-results (ar), appraisal-policy (ap).`)
 	cmd.Flags().StringVarP(&cmwCreateOutputFile, "output", "o", "", "Location of output file")
 	cmd.Flags().StringVarP(&cmwCreateCmwc_t, "cmwc_t", "c", "", "The __cmwc_t of the parent collection")
 	return cmd
+
 }
-func checkCmwCreateArgs() error {
-	if len(cmwCreateFiles) == 0 {
-		return errors.New("no data inputted")
+func parseCmwCreateArgs() ([]data, error) {
+	var createDataStruct []data // Return value
+
+	// Split cmwCreateData in label, indicator, filepath
+	createData := make([]([]string), len(cmwCreateData))
+	for i, v := range cmwCreateData {
+		createData[i] = strings.SplitN(v, ":", 3)
 	}
 
-	if len(cmwCreateFiles) > 1 && len(cmwCreateFiles) != len(cmwCreateLabels) {
-		return fmt.Errorf("non-equal amount of files and labels input. Given %d files, but %d labels.", len(cmwCreateFiles), len(cmwCreateLabels))
+	// Case: creating record
+	if len(createData) == 1 {
+		if len(createData[0]) != 2 {
+			return nil, fmt.Errorf("attempted to create record with improper --data argument. Expected indicator:filePath, instead recieved %d terms: %s", len(createData[0]), createData[0])
+		}
+
+		createData[0] = slices.Concat([]string{""}, createData[0]) // Add dummy label of ""
+		// Case: creating collection
+	} else {
+		for _, v := range createData {
+			if len(v) != 3 {
+				return nil, fmt.Errorf("attempted to create collection with improper aguments. Expected all --data arguments to be in form label:indicator:filePath. Instead, recieved --data argument with %d terms: %s", len(v), v)
+			}
+		}
+
 	}
 
-	return nil
+	// Create final struct and return
+	createDataStruct = make([]data, len(createData))
+	for i, v := range createData {
+		var ind cmw.Indicator
+		switch v[1] {
+		case "reference-values", "r":
+			ind.Set(cmw.ReferenceValues)
+		case "endorsements", "en":
+			ind.Set(cmw.Endorsements)
+		case "evidence", "ev":
+			ind.Set(cmw.Evidence)
+		case "attestation-results", "ar":
+			ind.Set(cmw.AttestationResults)
+		case "appraisal-policy", "ap":
+			ind.Set(cmw.AppraisalPolicy)
+		default:
+			return nil, fmt.Errorf("recieved invalid indicator. Recieved %s. Accepted values can be found by running cmwcli create --help.", v[1])
+		}
+
+		createDataStruct[i] = data{
+			label:     v[0],
+			indicator: ind,
+			filePath:  v[2],
+		}
+	}
+
+	return createDataStruct, nil
 }
 
 func init() {
